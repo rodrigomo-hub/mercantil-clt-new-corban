@@ -90,24 +90,54 @@ async def simular(req: SimularRequest):
       username: string opcional (ex: "ACCRE57309.master") - se omitido, usa NEWCORBAN_USERNAME
       password: string opcional - se omitido, usa NEWCORBAN_PASSWORD
     
-    Response:
-      resultado: "aprovado" | "reprovado" | "reprovado_elegibilidade"
-      anotacao: motivo
-      simulacoes: array com opcoes de parcelamento
-      cliente: nome e cpf
-      operacao_id: uuid da operacao
-      matricula: matricula no banco
+    Response (simplificado para o vendedor):
+      resultado: "pre_aprovado" | "reprovado"
+      cliente: {nome, cpf}
+      anotacao: detalhes da oferta (prazo, valor, taxa) ou motivo da reprovação
     """
     try:
         config = get_config(req)
-        resultado = fluxo_completo_mercantil_clt(
+        resultado_completo = fluxo_completo_mercantil_clt(
             cpf=req.cpf,
             telefone=req.telefone,
             data_nascimento=req.data_nascimento,
             qtd_parcelas_opcoes=req.qtd_parcelas_opcoes,
             config=config,
         )
-        return resultado
+        
+        # Simplificar para exibir ao vendedor - TUDO na anotacao
+        if resultado_completo["resultado"] == "aprovado" and resultado_completo["simulacoes"]:
+            # Pega a melhor opção (primeira = maior prazo, menor parcela)
+            melhor_opcao = resultado_completo["simulacoes"][0]
+            nome_cliente = resultado_completo["cliente"]["nome"]
+            cpf_cliente = resultado_completo["cliente"]["cpf"]
+            anotacao = (
+                f"✓ PRÉ-APROVADO NO BANCO MERCANTIL\n"
+                f"Cliente: {nome_cliente}\n"
+                f"CPF: {cpf_cliente}\n"
+                f"Prazo: {melhor_opcao['qtd_parcelas']}x\n"
+                f"Parcela: R$ {melhor_opcao['valor_parcela']:.2f}\n"
+                f"Valor Liberado: R$ {melhor_opcao['valor_liberado']:.2f}\n"
+                f"Taxa: {melhor_opcao['taxa_juros_mes']:.2f}% a.m."
+            )
+            return {
+                "resultado": "pre_aprovado",
+                "anotacao": anotacao,
+            }
+        else:
+            nome_cliente = resultado_completo["cliente"]["nome"]
+            cpf_cliente = resultado_completo["cliente"]["cpf"]
+            motivo = resultado_completo["anotacao"]
+            anotacao = (
+                f"✗ REPROVADO NO BANCO MERCANTIL\n"
+                f"Cliente: {nome_cliente}\n"
+                f"CPF: {cpf_cliente}\n"
+                f"Motivo: {motivo}"
+            )
+            return {
+                "resultado": "reprovado",
+                "anotacao": anotacao,
+            }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -122,16 +152,23 @@ async def root():
         "versao": "1.0.0",
         "endpoints": [
             {"GET": "/health", "desc": "Health check"},
-            {"POST": "/simular", "desc": "Simular credito CLT (credenciais no request ou env vars)"},
+            {"POST": "/simular", "desc": "Simular credito CLT (retorno simplificado para vendedor)"},
         ],
         "github": "https://github.com/rodrigomo-hub/mercantil-clt-new-corban",
         "exemplo_request": {
             "cpf": "130.702.519-60",
             "data_nascimento": "2005-04-19",
-            "telefone": "(11) 98765-4321",
             "subdomain": "accred",
             "username": "ACCRE57309.master",
             "password": "Alice@1011*",
+        },
+        "exemplo_resposta_aprovado": {
+            "resultado": "pre_aprovado",
+            "anotacao": "✓ PRÉ-APROVADO NO BANCO MERCANTIL\nCliente: VITOR MATEUS GODOIS DE SOUZA\nCPF: 130.702.519-60\nPrazo: 24x\nParcela: R$ 519.75\nValor Liberado: R$ 6342.82\nTaxa: 4.66% a.m."
+        },
+        "exemplo_resposta_reprovado": {
+            "resultado": "reprovado",
+            "anotacao": "✗ REPROVADO NO BANCO MERCANTIL\nCliente: NOME CLIENTE\nCPF: XXX.XXX.XXX-XX\nMotivo: Simulação não atendida pela política de crédito no momento."
         },
     }
 
