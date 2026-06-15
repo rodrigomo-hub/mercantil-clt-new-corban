@@ -105,7 +105,7 @@ async def simular(req: SimularRequest):
             config=config,
         )
         
-        # Simplificar para exibir ao vendedor - TUDO na anotacao
+        # Simplificar para exibir ao vendedor - TUDO na anotacao + campos separados
         if resultado_completo["resultado"] == "aprovado" and resultado_completo["simulacoes"]:
             # Pega a melhor opção (primeira = maior prazo, menor parcela)
             melhor_opcao = resultado_completo["simulacoes"][0]
@@ -123,6 +123,15 @@ async def simular(req: SimularRequest):
             return {
                 "resultado": "pre_aprovado",
                 "anotacao": anotacao,
+                "cliente_nome": nome_cliente,
+                "cliente_cpf": cpf_cliente,
+                "prazo": f"{melhor_opcao['qtd_parcelas']}x",
+                "valor_parcela": f"R$ {melhor_opcao['valor_parcela']:.2f}",
+                "valor_liberado": f"R$ {melhor_opcao['valor_liberado']:.2f}",
+                "taxa_juros_mes": f"{melhor_opcao['taxa_juros_mes']:.2f}% a.m.",
+                "valor_parcela_numero": melhor_opcao['valor_parcela'],
+                "valor_liberado_numero": melhor_opcao['valor_liberado'],
+                "taxa_numero": melhor_opcao['taxa_juros_mes'],
             }
         else:
             nome_cliente = resultado_completo["cliente"]["nome"]
@@ -137,6 +146,9 @@ async def simular(req: SimularRequest):
             return {
                 "resultado": "reprovado",
                 "anotacao": anotacao,
+                "cliente_nome": nome_cliente,
+                "cliente_cpf": cpf_cliente,
+                "motivo": motivo,
             }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -164,11 +176,23 @@ async def root():
         },
         "exemplo_resposta_aprovado": {
             "resultado": "pre_aprovado",
-            "anotacao": "✓ PRÉ-APROVADO NO BANCO MERCANTIL\nCliente: VITOR MATEUS GODOIS DE SOUZA\nCPF: 130.702.519-60\nPrazo: 24x\nParcela: R$ 519.75\nValor Liberado: R$ 6342.82\nTaxa: 4.66% a.m."
+            "anotacao": "✓ PRÉ-APROVADO NO BANCO MERCANTIL\nCliente: VITOR MATEUS GODOIS DE SOUZA\nCPF: 130.702.519-60\nPrazo: 24x\nParcela: R$ 519.75\nValor Liberado: R$ 6342.82\nTaxa: 4.66% a.m.",
+            "cliente_nome": "VITOR MATEUS GODOIS DE SOUZA",
+            "cliente_cpf": "130.702.519-60",
+            "prazo": "24x",
+            "valor_parcela": "R$ 519.75",
+            "valor_liberado": "R$ 6342.82",
+            "taxa_juros_mes": "4.66% a.m.",
+            "valor_parcela_numero": 519.75,
+            "valor_liberado_numero": 6342.82,
+            "taxa_numero": 4.66
         },
         "exemplo_resposta_reprovado": {
             "resultado": "reprovado",
-            "anotacao": "✗ REPROVADO NO BANCO MERCANTIL\nCliente: NOME CLIENTE\nCPF: XXX.XXX.XXX-XX\nMotivo: Simulação não atendida pela política de crédito no momento."
+            "anotacao": "✗ REPROVADO NO BANCO MERCANTIL\nCliente: NOME CLIENTE\nCPF: XXX.XXX.XXX-XX\nMotivo: Simulação não atendida pela política de crédito no momento.",
+            "cliente_nome": "NOME CLIENTE",
+            "cliente_cpf": "XXX.XXX.XXX-XX",
+            "motivo": "Simulação não atendida pela política de crédito no momento."
         },
     }
 
